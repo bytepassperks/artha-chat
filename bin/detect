@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo "Artha Chat (Mattermost)"
+exit 0

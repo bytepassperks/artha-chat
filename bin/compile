@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -e
+BUILD_DIR="$1"
+CACHE_DIR="$2"
+
+MM_VERSION="11.8.1"
+MM_URL="https://releases.mattermost.com/$MM_VERSION/mattermost-team-$MM_VERSION-linux-amd64.tar.gz"
+
+echo "-----> Installing Mattermost $MM_VERSION"
+
+if [ -f "$CACHE_DIR/mattermost-$MM_VERSION.tar.gz" ]; then
+  echo "       Using cached download"
+else
+  echo "       Downloading from $MM_URL"
+  curl -sL "$MM_URL" -o "$CACHE_DIR/mattermost-$MM_VERSION.tar.gz"
+fi
+
+echo "       Extracting..."
+tar xzf "$CACHE_DIR/mattermost-$MM_VERSION.tar.gz" -C /tmp/
+cp -a /tmp/mattermost/* "$BUILD_DIR/"
+
+echo "-----> Applying Artha branding patches"
+
+# Patch root.html
+sed -i 's|<title>Mattermost</title>|<title>Artha Chat</title>|g' "$BUILD_DIR/client/root.html"
+sed -i 's|content="Mattermost"|content="Artha Chat"|g' "$BUILD_DIR/client/root.html"
+sed -i 's|</head>|<style>.freeBadge{display:none!important}</style></head>|' "$BUILD_DIR/client/root.html"
+
+# Patch JS files
+for f in "$BUILD_DIR"/client/*.js; do
+  if grep -q 'TEAM EDITION' "$f" 2>/dev/null; then
+    sed -i 's/TEAM EDITION//g' "$f"
+    sed -i 's/ENTRY EDITION//g' "$f"
+  fi
+  if grep -q 'Mattermost, Inc. All rights reserved' "$f" 2>/dev/null; then
+    sed -i 's/Mattermost, Inc\. All rights reserved/Artha Suite. All rights reserved/g' "$f"
+  fi
+done
+
+# Patch i18n
+for f in "$BUILD_DIR"/client/i18n/*.json; do
+  if grep -q "Mattermost, Inc" "$f" 2>/dev/null; then
+    sed -i 's/Mattermost, Inc\./Artha Suite./g' "$f"
+  fi
+done
+
+# Remove unnecessary large files
+rm -f "$BUILD_DIR/bin/mmctl"
+rm -rf "$BUILD_DIR/prepackaged_plugins"
+mkdir -p "$BUILD_DIR/prepackaged_plugins"
+
+# Remove source maps
+find "$BUILD_DIR/client/" -name "*.map" -delete
+
+echo "-----> Artha branding patches applied"
+echo "       Title: Artha Chat"
+echo "       TEAM EDITION badge: hidden"
+echo "       Copyright: Artha Suite"
